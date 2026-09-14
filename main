@@ -1,0 +1,131 @@
+local players = game:GetService("Players")
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local ts = game:GetService("TweenService")
+local vim = game:GetService("VirtualInputManager")
+
+local player = players.LocalPlayer
+
+local camera = workspace.CurrentCamera
+local mouse = player:GetMouse()
+
+local ui = loadstring(game:HttpGet('https://raw.githubusercontent.com/user-bee/modules/refs/heads/main/ui.luau'))()
+local drawing = loadstring(game:HttpGet('https://raw.githubusercontent.com/user-bee/modules/refs/heads/main/drawing.lua'))()
+
+local charFolder = game:GetService("Workspace"):WaitForChild("Players")
+local loggedChars = {}
+
+ui.useCustomCursor = false
+ui.fontColor = Color3.fromRGB(245, 245, 250)
+ui.mainColor = Color3.fromRGB(25, 25, 30)
+ui.backgroundColor = Color3.fromRGB(15, 15, 20) 
+ui.accentColor = Color3.fromRGB(140, 90, 255) 
+ui.outlineColor = Color3.fromRGB(45, 45, 50)
+ui.riskColor = Color3.fromRGB(255, 75, 75)
+ui.accentColorDark = Color3.fromRGB(45, 45, 50)
+
+-- main window
+local window = ui:createWindow({Title = 'nowlol', Center = true, AutoShow = true, TabPadding = 8, MenuFadeTime = 0.2, Size = UDim2.fromOffset(400, 600)})
+local tabs = {visual = window:addTab('visual'), combat = window:addTab('combat'), config = window:addTab("config")}
+
+-- visual tab
+local visualEsp = tabs.visual:addLeftGroupbox('esp')
+local visualSettings = tabs.visual:addRightGroupbox('esp settings')
+
+local boxEsp = visualEsp:addToggle('boxEsp', {Text = 'box esp', Default = false})
+local wireframeEsp = visualEsp:addToggle('wireframeEsp', {Text = 'wireframe esp', Default = false})
+
+local showEspFov = visualSettings:addToggle('showEspFov', {Text = 'show esp fov', Default = true})
+local espRadius = visualSettings:addSlider('espRadius', {Text = 'fov radius', Default = 100, Min = 10, Max = 1000, Rounding = 0})
+
+-- combat tab
+local combatAimbot = tabs.combat:addLeftGroupbox('aimbot')
+local combatTriggerbot = tabs.combat:addRightGroupbox('triggerbot')
+
+local aimbot = combatAimbot:addToggle('aimbot', {Text = 'aimbot', Default = false})
+local triggerbot = combatTriggerbot:addToggle('triggerbot', {Text = 'triggerbot', Default = false})
+
+local aimbotSmoothness = combatAimbot:addSlider('aimbotSmoothness', {Text = 'aimbot smoothness', Default = 0.1, Min = 0, Max = 1, Rounding = 1})
+local triggerbotDelay = combatTriggerbot:addSlider('triggerbotDelay', {Text = 'triggerbot delay', Default = 25, Min = 0, Max = 100, Rounding = 0})
+
+-- config tab
+local configMain = tabs.config:addLeftGroupbox('aimbot')
+
+-- functions
+local function GetBoundingBox2D(cframe, size)
+    local x, y, z = size.X / 2, size.Y / 2, size.Z / 2
+    
+    local corners = {
+        cframe * CFrame.new(x, y, z),
+        cframe * CFrame.new(-x, y, z),
+        cframe * CFrame.new(x, -y, z),
+        cframe * CFrame.new(-x, -y, z),
+        cframe * CFrame.new(x, y, -z),
+        cframe * CFrame.new(-x, y, -z),
+        cframe * CFrame.new(x, -y, -z),
+        cframe * CFrame.new(-x, -y, -z)
+    }
+    
+    local minX, minY = math.huge, math.huge
+    local maxX, maxY = -math.huge, -math.huge
+    local isVisible = false
+
+    for _, corner in ipairs(corners) do
+        local screenPos, onScreen = camera:WorldToViewportPoint(corner.Position)
+        if onScreen then
+            isVisible = true
+        end
+        if screenPos.X < minX then minX = screenPos.X end
+        if screenPos.X > maxX then maxX = screenPos.X end
+        if screenPos.Y < minY then minY = screenPos.Y end
+        if screenPos.Y > maxY then maxY = screenPos.Y end
+    end
+
+    return isVisible, Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
+end
+
+-- connections
+rs.RenderStepped:Connect(function()
+    for _, char in ipairs(charFolder:GetDescendants()) do
+        if char:IsA("Model") then
+            if not loggedChars[char] then
+                local box = Drawing.new("Square")
+                box.Color = Color3.fromRGB(255, 255, 255)
+                box.Thickness = 1
+                box.Filled = false
+                box.Transparency = 1
+                box.Visible = false
+                
+                loggedChars[char] = box
+            end
+        end
+    end
+
+    for char, box in pairs(loggedChars) do
+        if char and char.Parent then
+            local cf, size = char:GetBoundingBox()
+            if size.Magnitude > 0 then
+                local isVisible, pos, boxSize = GetBoundingBox2D(cf, size)
+                if isVisible then
+                    if toggles.boxEsp.value then
+                        box.Size = boxSize
+                        box.Position = pos
+                        box.Visible = true
+                    else
+                        box.Visible = false
+                    end
+                else
+                    box.Visible = false
+                end
+            else
+                box.Visible = false
+            end
+        else
+            box:Remove()
+            loggedChars[char] = nil
+        end
+    end
+end)
+
+ui:notify("loaded", 3)
+ui:notify("use RSHIFT to toggle menu", 3)
